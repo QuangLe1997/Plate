@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../data/models/scan_result.dart';
@@ -9,6 +10,7 @@ class HistoryItem extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
   final VoidCallback? onCopy;
+  final VoidCallback? onCall;
 
   const HistoryItem({
     super.key,
@@ -16,7 +18,26 @@ class HistoryItem extends StatelessWidget {
     this.onTap,
     this.onDelete,
     this.onCopy,
+    this.onCall,
   });
+
+  Future<void> _makePhoneCall(BuildContext context) async {
+    if (result.ownerPhone == null) return;
+
+    final Uri launchUri = Uri(scheme: 'tel', path: result.ownerPhone);
+    try {
+      await launchUrl(
+        launchUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Khong the goi: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,74 +63,155 @@ class HistoryItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Vehicle icon
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    result.vehicleType == 'car'
-                        ? Icons.directions_car
-                        : Icons.two_wheeler,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Plate info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.plateNumber,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                          color: AppColors.plateText,
-                        ),
+                // Top row: plate + time
+                Row(
+                  children: [
+                    // Vehicle icon
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                      child: Icon(
+                        result.vehicleType == 'car'
+                            ? Icons.directions_car
+                            : Icons.two_wheeler,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Plate info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            DateFormat('HH:mm').format(result.scannedAt),
+                            result.plateNumber,
                             style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                              color: AppColors.plateText,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          _ConfidenceIndicator(confidence: result.confidence),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('HH:mm - dd/MM').format(result.scannedAt),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _ConfidenceIndicator(confidence: result.confidence),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+
+                    // Copy button
+                    IconButton(
+                      onPressed: onCopy,
+                      icon: const Icon(
+                        Icons.copy,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      tooltip: 'Sao chep',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    ),
+                  ],
                 ),
 
-                // Copy button
-                IconButton(
-                  onPressed: onCopy,
-                  icon: const Icon(
-                    Icons.copy,
-                    size: 20,
-                    color: AppColors.textSecondary,
+                // Owner info row (if available)
+                if (result.hasOwnerInfo) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight.withAlpha(50),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        // Owner info
+                        Icon(
+                          Icons.person,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                result.ownerName ?? '',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              if (result.ownerAddress != null)
+                                Text(
+                                  result.ownerAddress!,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        // Call button
+                        if (result.ownerPhone != null)
+                          ElevatedButton.icon(
+                            onPressed: () => _makePhoneCall(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.success,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              minimumSize: Size.zero,
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.call, size: 14),
+                            label: const Text(
+                              'Goi',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  tooltip: 'Sao chep',
-                ),
+                ],
               ],
             ),
           ),

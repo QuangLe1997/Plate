@@ -9,6 +9,13 @@ class ScanResult {
   final Rect? boundingBox;
   final String? imagePath;
 
+  // Owner info (loaded from API/fake data)
+  final String? ownerName;
+  final String? ownerPhone;
+  final String? ownerGender;
+  final int? ownerAge;
+  final String? ownerAddress;
+
   ScanResult({
     required this.id,
     required this.plateNumber,
@@ -17,6 +24,11 @@ class ScanResult {
     required this.scannedAt,
     this.boundingBox,
     this.imagePath,
+    this.ownerName,
+    this.ownerPhone,
+    this.ownerGender,
+    this.ownerAge,
+    this.ownerAddress,
   });
 
   // Copy with
@@ -28,6 +40,11 @@ class ScanResult {
     DateTime? scannedAt,
     Rect? boundingBox,
     String? imagePath,
+    String? ownerName,
+    String? ownerPhone,
+    String? ownerGender,
+    int? ownerAge,
+    String? ownerAddress,
   }) {
     return ScanResult(
       id: id ?? this.id,
@@ -37,6 +54,11 @@ class ScanResult {
       scannedAt: scannedAt ?? this.scannedAt,
       boundingBox: boundingBox ?? this.boundingBox,
       imagePath: imagePath ?? this.imagePath,
+      ownerName: ownerName ?? this.ownerName,
+      ownerPhone: ownerPhone ?? this.ownerPhone,
+      ownerGender: ownerGender ?? this.ownerGender,
+      ownerAge: ownerAge ?? this.ownerAge,
+      ownerAddress: ownerAddress ?? this.ownerAddress,
     );
   }
 
@@ -49,6 +71,11 @@ class ScanResult {
       vehicleType: json['vehicle_type'] as String,
       scannedAt: DateTime.parse(json['scanned_at'] as String),
       imagePath: json['image_path'] as String?,
+      ownerName: json['owner_name'] as String?,
+      ownerPhone: json['owner_phone'] as String?,
+      ownerGender: json['owner_gender'] as String?,
+      ownerAge: json['owner_age'] as int?,
+      ownerAddress: json['owner_address'] as String?,
     );
   }
 
@@ -61,8 +88,16 @@ class ScanResult {
       'vehicle_type': vehicleType,
       'scanned_at': scannedAt.toIso8601String(),
       'image_path': imagePath,
+      'owner_name': ownerName,
+      'owner_phone': ownerPhone,
+      'owner_gender': ownerGender,
+      'owner_age': ownerAge,
+      'owner_address': ownerAddress,
     };
   }
+
+  // Check if has owner info
+  bool get hasOwnerInfo => ownerName != null && ownerPhone != null;
 
   // Get formatted confidence as percentage
   String get confidencePercent => '${(confidence * 100).toInt()}%';

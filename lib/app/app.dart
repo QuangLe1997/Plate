@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
 import 'routes.dart';
@@ -7,6 +8,9 @@ import '../core/constants/strings.dart';
 import '../presentation/providers/scan_provider.dart';
 import '../presentation/providers/history_provider.dart';
 import '../presentation/providers/settings_provider.dart';
+
+// Global RouteObserver for detecting navigation events
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 class PlateSnapApp extends StatelessWidget {
   const PlateSnapApp({super.key});
@@ -27,12 +31,16 @@ class PlateSnapApp extends StatelessWidget {
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settingsProvider, child) {
-          // Apply settings to scan provider
-          final scanProvider = context.read<ScanProvider>();
-          scanProvider.setConfidenceThreshold(settingsProvider.confidenceThreshold);
-          scanProvider.setAutoContinuousScan(settingsProvider.autoContinuousScan);
-          scanProvider.setSoundEnabled(settingsProvider.soundEnabled);
-          scanProvider.setVibrationEnabled(settingsProvider.vibrationEnabled);
+          // Schedule settings sync after build phase
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            final scanProvider = context.read<ScanProvider>();
+            scanProvider.updateSettings(
+              confidenceThreshold: settingsProvider.confidenceThreshold,
+              autoContinuousScan: settingsProvider.autoContinuousScan,
+              soundEnabled: settingsProvider.soundEnabled,
+              vibrationEnabled: settingsProvider.vibrationEnabled,
+            );
+          });
 
           return MaterialApp(
             title: AppStrings.appName,
@@ -40,6 +48,7 @@ class PlateSnapApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             initialRoute: AppRoutes.splash,
             onGenerateRoute: AppRoutes.generateRoute,
+            navigatorObservers: [routeObserver],
           );
         },
       ),

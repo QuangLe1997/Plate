@@ -3,8 +3,19 @@ class AppStrings {
 
   // App Info
   static const String appName = 'PlateSnap';
-  static const String tagline = 'Quet bien so - Nhanh nhu chop';
+  static const String tagline = 'AI trong tam tay';
   static const String version = '1.0.0';
+
+  // Company Info
+  static const String companyName = 'NEXTIA';
+  static const String companySlogan = 'AI TRONG TAM TAY';
+  static const String companyPhone = '19006837';
+  static const String companyEmail = 'contact@nextia.vn';
+  static const String companyWebsite = 'https://nextia.vn';
+  static const String companyDescription =
+      'Nen tang ung dung AI su dung cong nghe tien tien de phan tich va so hoa du lieu tu hinh anh va video';
+  static const String poweredBy = 'Powered by NEXTIA';
+  static const String copyright = '2024 NEXTIA. All rights reserved.';
 
   // Scan Screen
   static const String scanInstruction = 'Huong camera vao bien so xe';
@@ -35,7 +46,7 @@ class AppStrings {
   static const String vibration = 'Rung';
   static const String information = 'Thong tin';
   static const String appVersion = 'Phien ban';
-  static const String about = 'Ve PlateSnap';
+  static const String about = 'Ve ung dung';
 
   // Result
   static const String success = 'Thanh cong!';
@@ -56,4 +67,10 @@ class AppStrings {
   static const String errorCameraNotAvailable = 'Camera khong kha dung';
   static const String errorOcrFailed = 'Loi nhan dien. Vui long thu lai.';
   static const String errorModelLoadFailed = 'Loi tai model ML';
+
+  // Contact
+  static const String contactSupport = 'Lien he ho tro';
+  static const String callHotline = 'Goi hotline';
+  static const String sendEmail = 'Gui email';
+  static const String visitWebsite = 'Truy cap website';
 }

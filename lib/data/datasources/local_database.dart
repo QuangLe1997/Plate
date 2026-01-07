@@ -4,7 +4,7 @@ import '../models/scan_result.dart';
 
 class LocalDatabase {
   static const String _databaseName = 'platesnap.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2; // Upgraded for owner info + unique plate
 
   static const String tableScanHistory = 'scan_history';
 
@@ -32,11 +32,16 @@ class LocalDatabase {
     await db.execute('''
       CREATE TABLE $tableScanHistory (
         id TEXT PRIMARY KEY,
-        plate_number TEXT NOT NULL,
+        plate_number TEXT NOT NULL UNIQUE,
         confidence REAL NOT NULL,
         vehicle_type TEXT NOT NULL,
         scanned_at TEXT NOT NULL,
-        image_path TEXT
+        image_path TEXT,
+        owner_name TEXT,
+        owner_phone TEXT,
+        owner_gender TEXT,
+        owner_age INTEGER,
+        owner_address TEXT
       )
     ''');
 
@@ -46,20 +51,54 @@ class LocalDatabase {
     ''');
 
     await db.execute('''
-      CREATE INDEX idx_plate_number ON $tableScanHistory (plate_number)
+      CREATE UNIQUE INDEX idx_plate_number ON $tableScanHistory (plate_number)
     ''');
   }
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Handle database migrations here
     if (oldVersion < 2) {
-      // Migration for version 2
+      // Add owner info columns
+      await db.execute('ALTER TABLE $tableScanHistory ADD COLUMN owner_name TEXT');
+      await db.execute('ALTER TABLE $tableScanHistory ADD COLUMN owner_phone TEXT');
+      await db.execute('ALTER TABLE $tableScanHistory ADD COLUMN owner_gender TEXT');
+      await db.execute('ALTER TABLE $tableScanHistory ADD COLUMN owner_age INTEGER');
+      await db.execute('ALTER TABLE $tableScanHistory ADD COLUMN owner_address TEXT');
     }
   }
 
-  // Insert scan result
+  // Insert or update scan result (unique by plate_number)
   static Future<int> insertScanResult(ScanResult result) async {
     final db = await database;
+
+    // Check if plate already exists
+    final existing = await db.query(
+      tableScanHistory,
+      where: 'plate_number = ?',
+      whereArgs: [result.plateNumber],
+    );
+
+    if (existing.isNotEmpty) {
+      // Update existing record with new scan time and owner info
+      return await db.update(
+        tableScanHistory,
+        {
+          'confidence': result.confidence,
+          'vehicle_type': result.vehicleType,
+          'scanned_at': result.scannedAt.toIso8601String(),
+          'image_path': result.imagePath,
+          'owner_name': result.ownerName,
+          'owner_phone': result.ownerPhone,
+          'owner_gender': result.ownerGender,
+          'owner_age': result.ownerAge,
+          'owner_address': result.ownerAddress,
+        },
+        where: 'plate_number = ?',
+        whereArgs: [result.plateNumber],
+      );
+    }
+
+    // Insert new record
     return await db.insert(
       tableScanHistory,
       result.toJson(),

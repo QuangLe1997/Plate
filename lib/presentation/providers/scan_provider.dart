@@ -11,6 +11,7 @@ import '../../services/ocr/models/ocr_result.dart';
 import '../../services/camera_service.dart';
 import '../../services/audio_service.dart';
 import '../../services/haptic_service.dart';
+import '../../services/vehicle_owner_service.dart';
 
 enum ScanState {
   idle,
@@ -76,6 +77,33 @@ class ScanProvider extends ChangeNotifier {
     _hapticService.setEnabled(enabled);
   }
 
+  /// Update all settings at once (called from app initialization)
+  void updateSettings({
+    required double confidenceThreshold,
+    required bool autoContinuousScan,
+    required bool soundEnabled,
+    required bool vibrationEnabled,
+  }) {
+    bool changed = false;
+
+    if (_confidenceThreshold != confidenceThreshold) {
+      _confidenceThreshold = confidenceThreshold;
+      changed = true;
+    }
+
+    if (_autoContinuousScan != autoContinuousScan) {
+      _autoContinuousScan = autoContinuousScan;
+      changed = true;
+    }
+
+    _audioService.setEnabled(soundEnabled);
+    _hapticService.setEnabled(vibrationEnabled);
+
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
   Future<void> initialize() async {
     _state = ScanState.initializing;
     _errorMessage = null;
@@ -115,10 +143,38 @@ class ScanProvider extends ChangeNotifier {
     }
   }
 
+  /// Stop image stream only (detection stops but camera still active)
   Future<void> stopScanning() async {
+    debugPrint('=== [ScanProvider] stopScanning() called');
+    _isProcessing = false;
     await _cameraService.stopImageStream();
     _state = ScanState.idle;
+    notifyListeners();
+    debugPrint('=== [ScanProvider] Image stream STOPPED');
+  }
+
+  /// COMPLETELY turn off camera - dispose controller
+  /// Call this when leaving scan screen
+  Future<void> pauseCamera() async {
+    debugPrint('=== [ScanProvider] pauseCamera() - DISPOSING CAMERA');
     _isProcessing = false;
+    _state = ScanState.idle;
+
+    // Dispose camera controller completely
+    await _cameraService.pauseCamera();
+
+    notifyListeners();
+    debugPrint('=== [ScanProvider] Camera DISPOSED');
+  }
+
+  /// Resume camera after pause
+  Future<void> resumeCamera() async {
+    debugPrint('=== [ScanProvider] resumeCamera()');
+
+    // Re-create camera controller
+    await _cameraService.resumeCamera();
+
+    debugPrint('=== [ScanProvider] Camera RESUMED');
     notifyListeners();
   }
 
@@ -132,32 +188,39 @@ class ScanProvider extends ChangeNotifier {
     try {
       final result = await _ocrService.processFrame(image);
 
-      if (result != null && result.confidence >= _confidenceThreshold) {
-        _currentResult = result;
-        _state = ScanState.detected;
+      if (result != null) {
+        debugPrint('=== OCR RESULT: ${result.plateNumber}, confidence: ${result.confidence}');
 
-        // Stop scanning if auto continuous is off
-        if (!_autoContinuousScan) {
+        if (result.confidence >= _confidenceThreshold) {
+          debugPrint('=== PLATE DETECTED! Stopping camera and detection stream');
+          _currentResult = result;
+          _state = ScanState.detected;
+
+          // ALWAYS stop camera stream when detection succeeds
           await _cameraService.stopImageStream();
+          debugPrint('=== Camera stream STOPPED');
+
+          // Play feedback
+          await _audioService.playSuccessSound();
+          await _hapticService.successFeedback();
+
+          // Save to history
+          await _saveToHistory(result);
+
+          notifyListeners();
         }
-
-        // Play feedback
-        await _audioService.playSuccessSound();
-        await _hapticService.successFeedback();
-
-        // Save to history
-        await _saveToHistory(result);
-
-        notifyListeners();
       }
     } catch (e) {
-      // Continue scanning on error
+      debugPrint('=== OCR ERROR: $e');
     } finally {
       _isProcessing = false;
     }
   }
 
   Future<void> _saveToHistory(OcrResult result) async {
+    // Fetch owner info
+    final owner = await VehicleOwnerService.fetchOwnerByPlate(result.plateNumber);
+
     final scanResult = ScanResult(
       id: const Uuid().v4(),
       plateNumber: result.plateNumber,
@@ -165,6 +228,11 @@ class ScanProvider extends ChangeNotifier {
       vehicleType: result.vehicleType,
       scannedAt: result.timestamp,
       boundingBox: result.boundingBox,
+      ownerName: owner?.fullName,
+      ownerPhone: owner?.phoneNumber,
+      ownerGender: owner?.gender,
+      ownerAge: owner?.age,
+      ownerAddress: owner?.displayAddress,
     );
 
     await _historyRepository.addScanResult(scanResult);

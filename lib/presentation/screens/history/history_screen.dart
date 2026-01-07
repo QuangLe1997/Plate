@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/strings.dart';
@@ -36,6 +37,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(AppStrings.history),
         actions: [
@@ -174,8 +176,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showDetailSheet(BuildContext context, ScanResult result) {
+    debugPrint('=== Opening detail sheet for: ${result.plateNumber}');
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => _DetailBottomSheet(result: result),
     );
   }
@@ -221,86 +229,250 @@ class _DetailBottomSheet extends StatelessWidget {
 
   const _DetailBottomSheet({required this.result});
 
+  Future<void> _makePhoneCall(BuildContext context) async {
+    debugPrint('=== _makePhoneCall: ownerPhone = ${result.ownerPhone}');
+
+    if (result.ownerPhone == null || result.ownerPhone!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong co so dien thoai')),
+      );
+      return;
+    }
+
+    final Uri phoneUri = Uri(scheme: 'tel', path: result.ownerPhone);
+    debugPrint('=== Calling: $phoneUri');
+
+    try {
+      final launched = await launchUrl(
+        phoneUri,
+        mode: LaunchMode.externalApplication,
+      );
+      debugPrint('=== Launch result: $launched');
+    } catch (e) {
+      debugPrint('=== Call error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Loi khi goi: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.textHint,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Plate number
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.textSecondary),
-            ),
-            child: Text(
-              result.plateNumber,
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-                color: AppColors.plateText,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.8,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // Details
-          _DetailRow(
-            label: AppStrings.vehicleType,
-            value: result.vehicleTypeDisplay,
-            icon: result.vehicleType == 'car'
-                ? Icons.directions_car
-                : Icons.two_wheeler,
-          ),
-          const SizedBox(height: 12),
-          _DetailRow(
-            label: AppStrings.confidence,
-            value: result.confidencePercent,
-            icon: Icons.analytics,
-          ),
-          const SizedBox(height: 12),
-          _DetailRow(
-            label: AppStrings.scannedAt,
-            value: DateFormat('dd/MM/yyyy HH:mm').format(result.scannedAt),
-            icon: Icons.access_time,
-          ),
-          const SizedBox(height: 24),
-
-          // Copy button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: result.plateNumber));
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(AppStrings.copied),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.copy),
-              label: const Text(AppStrings.copy),
+            // Plate number
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFDE7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black, width: 2),
+              ),
+              child: Text(
+                result.plateNumber,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  color: Colors.black,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 16),
+
+            // Owner info section
+            if (result.hasOwnerInfo) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Icon(Icons.person, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'THONG TIN CHU XE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Owner name
+                    Text(
+                      result.ownerName ?? 'N/A',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (result.ownerGender != null || result.ownerAge != null)
+                      Text(
+                        '${result.ownerGender ?? ''} ${result.ownerAge != null ? "- ${result.ownerAge} tuoi" : ""}',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 13,
+                        ),
+                      ),
+                    if (result.ownerPhone != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.phone, size: 18, color: AppColors.success),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                result.ownerPhone!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (result.ownerAddress != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on, size: 18, color: Colors.red[400]),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                result.ownerAddress!,
+                                style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Details
+            _DetailRow(
+              label: AppStrings.vehicleType,
+              value: result.vehicleTypeDisplay,
+              icon: result.vehicleType == 'car'
+                  ? Icons.directions_car
+                  : Icons.two_wheeler,
+            ),
+            const SizedBox(height: 12),
+            _DetailRow(
+              label: AppStrings.confidence,
+              value: result.confidencePercent,
+              icon: Icons.analytics,
+            ),
+            const SizedBox(height: 12),
+            _DetailRow(
+              label: AppStrings.scannedAt,
+              value: DateFormat('dd/MM/yyyy HH:mm').format(result.scannedAt),
+              icon: Icons.access_time,
+            ),
+            const SizedBox(height: 24),
+
+            // Buttons row
+            Row(
+              children: [
+                // Copy button
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: result.plateNumber));
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(AppStrings.copied),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.copy),
+                    label: const Text(AppStrings.copy),
+                  ),
+                ),
+                // Call button (if has phone)
+                if (result.ownerPhone != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _makePhoneCall(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.call),
+                      label: const Text('Goi ngay'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }

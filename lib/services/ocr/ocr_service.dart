@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'models/ocr_result.dart';
@@ -107,12 +108,18 @@ class OcrService implements IOcrService {
         return null;
       }
 
+      // Debug log
+      debugPrint('=== RAW OCR TEXT: ${recognizedText.text.replaceAll('\n', ' | ')}');
+
       // Find license plate in recognized text
       final plateResult = _extractPlateNumber(recognizedText);
 
       if (plateResult == null) {
+        debugPrint('=== NO PLATE FOUND in text');
         return null;
       }
+
+      debugPrint('=== FOUND PLATE: ${plateResult.plateNumber}, confidence: ${plateResult.confidence}');
 
       return OcrResult(
         plateNumber: plateResult.plateNumber,
@@ -121,6 +128,7 @@ class OcrService implements IOcrService {
         vehicleType: PlateValidator.getVehicleType(plateResult.plateNumber) ?? 'unknown',
       );
     } catch (e) {
+      debugPrint('=== OCR PROCESS ERROR: $e');
       return null;
     }
   }

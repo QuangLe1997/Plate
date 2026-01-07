@@ -24,35 +24,23 @@ class CameraPreviewWidget extends StatelessWidget {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cameraAspectRatio = controller!.value.aspectRatio;
-        final screenAspectRatio = constraints.maxWidth / constraints.maxHeight;
-
-        double scale;
-        if (screenAspectRatio > cameraAspectRatio) {
-          scale = constraints.maxWidth / (constraints.maxHeight * cameraAspectRatio);
-        } else {
-          scale = (constraints.maxWidth / cameraAspectRatio) / constraints.maxHeight;
-        }
-
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            // Camera preview
-            ClipRect(
-              child: Transform.scale(
-                scale: scale,
-                child: Center(
-                  child: CameraPreview(controller!),
-                ),
-              ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Camera preview - use SizedBox.expand to fill screen
+        SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller!.value.previewSize?.height ?? 1920,
+              height: controller!.value.previewSize?.width ?? 1080,
+              child: CameraPreview(controller!),
             ),
-            // Overlay
-            if (overlay != null) overlay!,
-          ],
-        );
-      },
+          ),
+        ),
+        // Overlay
+        if (overlay != null) overlay!,
+      ],
     );
   }
 }
