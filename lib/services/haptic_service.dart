@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 
 class HapticService {
   bool _isEnabled = true;
+  bool? _hasVibrator;
 
   bool get isEnabled => _isEnabled;
 
@@ -11,49 +12,68 @@ class HapticService {
     debugPrint('=== [HapticService] Vibration enabled: $enabled');
   }
 
+  /// Check if device has vibrator
+  Future<bool> _checkVibrator() async {
+    _hasVibrator ??= await Vibration.hasVibrator() ?? false;
+    return _hasVibrator!;
+  }
+
   Future<void> lightImpact() async {
     if (!_isEnabled) return;
-    await HapticFeedback.lightImpact();
+    if (!await _checkVibrator()) return;
+    await Vibration.vibrate(duration: 50);
   }
 
   Future<void> mediumImpact() async {
     if (!_isEnabled) return;
-    await HapticFeedback.mediumImpact();
+    if (!await _checkVibrator()) return;
+    await Vibration.vibrate(duration: 100);
   }
 
   Future<void> heavyImpact() async {
     if (!_isEnabled) return;
-    await HapticFeedback.heavyImpact();
+    if (!await _checkVibrator()) return;
+    await Vibration.vibrate(duration: 200);
   }
 
   Future<void> selectionClick() async {
     if (!_isEnabled) return;
-    await HapticFeedback.selectionClick();
+    if (!await _checkVibrator()) return;
+    await Vibration.vibrate(duration: 30);
   }
 
-  Future<void> vibrate() async {
+  Future<void> vibrate({int duration = 500}) async {
     if (!_isEnabled) return;
-    await HapticFeedback.vibrate();
+    if (!await _checkVibrator()) return;
+    await Vibration.vibrate(duration: duration);
   }
 
-  /// Play success feedback - use vibrate() for better Android compatibility
+  /// Play success feedback - vibrate for 300ms
   Future<void> successFeedback() async {
     if (!_isEnabled) {
       debugPrint('=== [HapticService] Vibration disabled, skipping');
       return;
     }
-    debugPrint('=== [HapticService] Playing success vibration...');
-    // Use vibrate() for better compatibility on Android devices
-    // mediumImpact() doesn't work on all Android devices
-    await HapticFeedback.vibrate();
+
+    final hasVibrator = await _checkVibrator();
+    debugPrint('=== [HapticService] Has vibrator: $hasVibrator');
+
+    if (!hasVibrator) {
+      debugPrint('=== [HapticService] No vibrator available');
+      return;
+    }
+
+    debugPrint('=== [HapticService] Playing success vibration (300ms)...');
+    await Vibration.vibrate(duration: 300);
     debugPrint('=== [HapticService] Vibration triggered');
   }
 
-  /// Play error feedback (heavy impact followed by light)
+  /// Play error feedback (two short vibrations)
   Future<void> errorFeedback() async {
     if (!_isEnabled) return;
-    await HapticFeedback.vibrate();
-    await Future.delayed(const Duration(milliseconds: 100));
-    await HapticFeedback.vibrate();
+    if (!await _checkVibrator()) return;
+
+    // Pattern: vibrate, pause, vibrate
+    await Vibration.vibrate(pattern: [0, 200, 100, 200]);
   }
 }
