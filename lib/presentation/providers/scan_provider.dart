@@ -34,6 +34,13 @@ class ScanProvider extends ChangeNotifier {
   bool _isProcessing = false;
   double _confidenceThreshold = 0.8;
   bool _autoContinuousScan = true;
+  int _startupDelayMs = 800;
+  int _confirmationFrames = 3;
+
+  // Frame confirmation tracking
+  String? _lastDetectedPlate;
+  int _consecutiveMatches = 0;
+  OcrResult? _bestResult;
 
   ScanProvider({
     CameraService? cameraService,
@@ -57,6 +64,9 @@ class ScanProvider extends ChangeNotifier {
   bool get isFlashOn => _cameraService.isFlashOn;
   double get confidenceThreshold => _confidenceThreshold;
   bool get autoContinuousScan => _autoContinuousScan;
+  int get startupDelayMs => _startupDelayMs;
+  int get confirmationFrames => _confirmationFrames;
+  int get consecutiveMatches => _consecutiveMatches;
 
   // Setters
   void setConfidenceThreshold(double value) {
@@ -77,29 +87,56 @@ class ScanProvider extends ChangeNotifier {
     _hapticService.setEnabled(enabled);
   }
 
+  void setStartupDelayMs(int value) {
+    _startupDelayMs = value;
+    notifyListeners();
+  }
+
+  void setConfirmationFrames(int value) {
+    _confirmationFrames = value;
+    notifyListeners();
+  }
+
   /// Update all settings at once (called from app initialization)
   void updateSettings({
     required double confidenceThreshold,
     required bool autoContinuousScan,
     required bool soundEnabled,
     required bool vibrationEnabled,
+    required int startupDelayMs,
+    required int confirmationFrames,
   }) {
     bool changed = false;
 
     if (_confidenceThreshold != confidenceThreshold) {
       _confidenceThreshold = confidenceThreshold;
       changed = true;
+      debugPrint('=== [Settings] confidenceThreshold updated: $confidenceThreshold');
     }
 
     if (_autoContinuousScan != autoContinuousScan) {
       _autoContinuousScan = autoContinuousScan;
       changed = true;
+      debugPrint('=== [Settings] autoContinuousScan updated: $autoContinuousScan');
+    }
+
+    if (_startupDelayMs != startupDelayMs) {
+      _startupDelayMs = startupDelayMs;
+      changed = true;
+      debugPrint('=== [Settings] startupDelayMs updated: ${startupDelayMs}ms');
+    }
+
+    if (_confirmationFrames != confirmationFrames) {
+      _confirmationFrames = confirmationFrames;
+      changed = true;
+      debugPrint('=== [Settings] confirmationFrames updated: $confirmationFrames');
     }
 
     _audioService.setEnabled(soundEnabled);
     _hapticService.setEnabled(vibrationEnabled);
 
     if (changed) {
+      debugPrint('=== [Settings] Settings synced to ScanProvider');
       notifyListeners();
     }
   }
@@ -132,15 +169,39 @@ class ScanProvider extends ChangeNotifier {
 
     _state = ScanState.scanning;
     _currentResult = null;
+
+    // Reset frame confirmation tracking
+    _resetFrameConfirmation();
+
     notifyListeners();
 
     try {
+      // Apply startup delay before starting detection
+      if (_startupDelayMs > 0) {
+        debugPrint('=== [ScanProvider] Waiting ${_startupDelayMs}ms startup delay...');
+        await Future.delayed(Duration(milliseconds: _startupDelayMs));
+
+        // Check if scanning was cancelled during delay
+        if (_state != ScanState.scanning) {
+          debugPrint('=== [ScanProvider] Scanning cancelled during startup delay');
+          return;
+        }
+      }
+
+      debugPrint('=== [ScanProvider] Starting image stream after delay');
       await _cameraService.startImageStream(_processFrame);
     } catch (e) {
       _state = ScanState.error;
       _errorMessage = e.toString();
       notifyListeners();
     }
+  }
+
+  /// Reset frame confirmation tracking
+  void _resetFrameConfirmation() {
+    _lastDetectedPlate = null;
+    _consecutiveMatches = 0;
+    _bestResult = null;
   }
 
   /// Stop image stream only (detection stops but camera still active)
@@ -188,33 +249,65 @@ class ScanProvider extends ChangeNotifier {
     try {
       final result = await _ocrService.processFrame(image);
 
-      if (result != null) {
+      if (result != null && result.confidence >= _confidenceThreshold) {
         debugPrint('=== OCR RESULT: ${result.plateNumber}, confidence: ${result.confidence}');
+        debugPrint('=== Last plate: $_lastDetectedPlate, consecutive: $_consecutiveMatches/$_confirmationFrames');
 
-        if (result.confidence >= _confidenceThreshold) {
-          debugPrint('=== PLATE DETECTED! Stopping camera and detection stream');
-          _currentResult = result;
-          _state = ScanState.detected;
+        // Check if this plate matches the last detected plate
+        if (result.plateNumber == _lastDetectedPlate) {
+          _consecutiveMatches++;
 
-          // ALWAYS stop camera stream when detection succeeds
-          await _cameraService.stopImageStream();
-          debugPrint('=== Camera stream STOPPED');
+          // Keep track of the best result (highest confidence)
+          if (_bestResult == null || result.confidence > _bestResult!.confidence) {
+            _bestResult = result;
+          }
 
-          // Play feedback
-          await _audioService.playSuccessSound();
-          await _hapticService.successFeedback();
+          debugPrint('=== MATCH! Consecutive: $_consecutiveMatches/$_confirmationFrames');
 
-          // Save to history
-          await _saveToHistory(result);
-
-          notifyListeners();
+          // Check if we have enough consecutive matches
+          if (_consecutiveMatches >= _confirmationFrames) {
+            debugPrint('=== CONFIRMED! ${_confirmationFrames} consecutive frames matched');
+            await _acceptDetection(_bestResult!);
+          }
+        } else {
+          // New plate detected, reset counter
+          debugPrint('=== NEW PLATE detected, resetting counter');
+          _lastDetectedPlate = result.plateNumber;
+          _consecutiveMatches = 1;
+          _bestResult = result;
         }
+
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('=== OCR ERROR: $e');
     } finally {
       _isProcessing = false;
     }
+  }
+
+  /// Accept the detection and trigger success feedback
+  Future<void> _acceptDetection(OcrResult result) async {
+    debugPrint('=== PLATE ACCEPTED: ${result.plateNumber}');
+    _currentResult = result;
+    _state = ScanState.detected;
+
+    // ALWAYS stop camera stream when detection succeeds
+    await _cameraService.stopImageStream();
+    debugPrint('=== Camera stream STOPPED');
+
+    // Play feedback - sound first, then haptic
+    await _audioService.playSuccessSound();
+    await _hapticService.successFeedback();
+    debugPrint('=== Feedback played (sound: ${_audioService.isEnabled}, vibration: ${_hapticService.isEnabled})');
+
+    // Save to history
+    await _saveToHistory(result);
+
+    // Reset confirmation tracking
+    _resetFrameConfirmation();
+
+    notifyListeners();
   }
 
   Future<void> _saveToHistory(OcrResult result) async {
@@ -255,6 +348,7 @@ class ScanProvider extends ChangeNotifier {
   void resetScan() {
     _currentResult = null;
     _state = ScanState.idle;
+    _resetFrameConfirmation();
     notifyListeners();
   }
 

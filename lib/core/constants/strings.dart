@@ -41,6 +41,10 @@ class AppStrings {
   static const String scanning = 'Quet';
   static const String confidenceThreshold = 'Nguong do chinh xac';
   static const String autoContinuousScan = 'Tu dong quet lien tuc';
+  static const String startupDelay = 'Do tre khoi dong';
+  static const String startupDelayDescription = 'Thoi gian cho truoc khi bat dau quet';
+  static const String confirmationFrames = 'So frame xac nhan';
+  static const String confirmationFramesDescription = 'So frame lien tiep can khop de xac nhan ket qua';
   static const String feedback = 'Phan hoi';
   static const String sound = 'Am thanh';
   static const String vibration = 'Rung';

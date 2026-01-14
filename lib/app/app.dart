@@ -39,6 +39,8 @@ class PlateSnapApp extends StatelessWidget {
               autoContinuousScan: settingsProvider.autoContinuousScan,
               soundEnabled: settingsProvider.soundEnabled,
               vibrationEnabled: settingsProvider.vibrationEnabled,
+              startupDelayMs: settingsProvider.startupDelayMs,
+              confirmationFrames: settingsProvider.confirmationFrames,
             );
           });
 

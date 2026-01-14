@@ -20,6 +20,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get soundEnabled => _settings.soundEnabled;
   bool get vibrationEnabled => _settings.vibrationEnabled;
   int get confidenceThresholdPercent => _settings.confidenceThresholdPercent;
+  int get startupDelayMs => _settings.startupDelayMs;
+  int get confirmationFrames => _settings.confirmationFrames;
+  double get startupDelaySeconds => _settings.startupDelaySeconds;
 
   void loadSettings() {
     _settings = _repository.getSettings();
@@ -47,6 +50,18 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setVibrationEnabled(bool value) async {
     _settings = _settings.copyWith(vibrationEnabled: value);
     await _repository.updateVibrationEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> setStartupDelayMs(int value) async {
+    _settings = _settings.copyWith(startupDelayMs: value);
+    await _repository.updateStartupDelayMs(value);
+    notifyListeners();
+  }
+
+  Future<void> setConfirmationFrames(int value) async {
+    _settings = _settings.copyWith(confirmationFrames: value);
+    await _repository.updateConfirmationFrames(value);
     notifyListeners();
   }
 

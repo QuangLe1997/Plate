@@ -33,6 +33,28 @@ class SettingsScreen extends StatelessWidget {
                     onChanged: (value) => provider.setConfidenceThreshold(value),
                   ),
                   const Divider(),
+                  _SliderSetting(
+                    title: AppStrings.startupDelay,
+                    subtitle: AppStrings.startupDelayDescription,
+                    value: provider.startupDelayMs.toDouble(),
+                    min: 0,
+                    max: 3000,
+                    divisions: 30,
+                    displayValue: '${(provider.startupDelayMs / 1000).toStringAsFixed(1)}s',
+                    onChanged: (value) => provider.setStartupDelayMs(value.toInt()),
+                  ),
+                  const Divider(),
+                  _SliderSetting(
+                    title: AppStrings.confirmationFrames,
+                    subtitle: AppStrings.confirmationFramesDescription,
+                    value: provider.confirmationFrames.toDouble(),
+                    min: 1,
+                    max: 10,
+                    divisions: 9,
+                    displayValue: '${provider.confirmationFrames} frames',
+                    onChanged: (value) => provider.setConfirmationFrames(value.toInt()),
+                  ),
+                  const Divider(),
                   _SwitchSetting(
                     title: AppStrings.autoContinuousScan,
                     value: provider.autoContinuousScan,
@@ -253,17 +275,21 @@ class _SwitchSetting extends StatelessWidget {
 
 class _SliderSetting extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final double value;
   final double min;
   final double max;
+  final int? divisions;
   final String displayValue;
   final ValueChanged<double> onChanged;
 
   const _SliderSetting({
     required this.title,
+    this.subtitle,
     required this.value,
     required this.min,
     required this.max,
+    this.divisions,
     required this.displayValue,
     required this.onChanged,
   });
@@ -278,9 +304,24 @@ class _SliderSetting extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontSize: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               Text(
                 displayValue,
@@ -296,7 +337,7 @@ class _SliderSetting extends StatelessWidget {
             value: value,
             min: min,
             max: max,
-            divisions: ((max - min) * 100).toInt(),
+            divisions: divisions ?? ((max - min) * 100).toInt(),
             onChanged: onChanged,
           ),
         ],

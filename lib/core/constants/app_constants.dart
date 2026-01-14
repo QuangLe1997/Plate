@@ -6,6 +6,16 @@ class AppConstants {
   static const double minConfidenceThreshold = 0.5;
   static const double maxConfidenceThreshold = 0.95;
 
+  // Startup Delay Settings (milliseconds)
+  static const int defaultStartupDelayMs = 800;
+  static const int minStartupDelayMs = 0;
+  static const int maxStartupDelayMs = 3000;
+
+  // Frame Confirmation Settings
+  static const int defaultConfirmationFrames = 3;
+  static const int minConfirmationFrames = 1;
+  static const int maxConfirmationFrames = 10;
+
   // Camera Settings
   static const double minZoom = 1.0;
   static const double maxZoom = 5.0;

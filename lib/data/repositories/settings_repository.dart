@@ -32,6 +32,16 @@ class SettingsRepository {
     await PreferencesService.setVibrationEnabled(value);
   }
 
+  // Update startup delay
+  Future<void> updateStartupDelayMs(int value) async {
+    await PreferencesService.setStartupDelayMs(value);
+  }
+
+  // Update confirmation frames
+  Future<void> updateConfirmationFrames(int value) async {
+    await PreferencesService.setConfirmationFrames(value);
+  }
+
   // Reset to defaults
   Future<void> resetToDefaults() async {
     await PreferencesService.saveSettings(AppSettings.defaults());

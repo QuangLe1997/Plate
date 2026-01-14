@@ -78,6 +78,26 @@ class PreferencesService {
     return getSettings().vibrationEnabled;
   }
 
+  // Startup delay
+  static Future<void> setStartupDelayMs(int value) async {
+    final settings = getSettings().copyWith(startupDelayMs: value);
+    await saveSettings(settings);
+  }
+
+  static int getStartupDelayMs() {
+    return getSettings().startupDelayMs;
+  }
+
+  // Confirmation frames
+  static Future<void> setConfirmationFrames(int value) async {
+    final settings = getSettings().copyWith(confirmationFrames: value);
+    await saveSettings(settings);
+  }
+
+  static int getConfirmationFrames() {
+    return getSettings().confirmationFrames;
+  }
+
   // First launch
   static Future<void> setFirstLaunch(bool value) async {
     await _preferences.setBool(_firstLaunchKey, value);
